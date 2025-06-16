@@ -2,15 +2,18 @@
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
-#include <esp_now.h>
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
+#include <DHT_U.h>
 
-// Wi-Fi credentials (só para WebServer, ESP-NOW usa modo STA)
-const char* ssid = "Galaxy S23 FE 3B1E";
-const char* password = "morrqdesgraca";
+// Wi-Fi credentials
+const char* ssid = "Casa 44 OI Fibra 2G";
+const char* password = "J626100452";
 
 // Pin definitions
-const int lm35Pin = 15;    // LM35 output pin
-const int buzzerPin = 25;  // Buzzer pin
+const int buzzerPin = 25; // Buzzer pin
+#define DHTPIN 15         // DHT22 data pin
+#define DHTTYPE DHT22     // DHT22 sensor type
 
 // Web server on port 80
 AsyncWebServer server(80);
@@ -22,42 +25,35 @@ bool acState = false;      // AC state (on/off)
 int connectedClients = 0;  // Number of WebSocket clients
 String receivedBody;       // Accumulate request body
 
-// MAC Address do ESP32 receptor (alterar conforme seu receptor)
-uint8_t peerAddress[] = {0x24, 0x6F, 0x28, 0xAB, 0xCD, 0xEF}; // << TROQUE PELO MAC REAL >>
+DHT_Unified dht(DHTPIN, DHTTYPE);
 
-// === Função para ler temperatura do LM35 ===
-float readLM35Temperature() {
-  int analogValue = analogRead(lm35Pin);
-  float voltage = analogValue * (3.3 / 4095.0);
-  float temperature = voltage * 100.0;
-  if (temperature < -40.0 || temperature > 125.0) {
-    Serial.printf("Invalid temperature reading: %.2f°C\n", temperature);
-    return desiredTemp;
+// Read temperature from DHT22
+float readDHT22Temperature() {
+  sensors_event_t event;
+  dht.temperature().getEvent(&event);
+  if (isnan(event.temperature)) {
+    Serial.println(F("Error reading temperature!"));
+    return desiredTemp; // Fallback to desired temperature
   }
-  return temperature;
-}
-//
-
-// === Função para enviar dados via ESP-NOW ===
-void sendESPNowMessage(const char* message) {
-  Serial.print("Sending ESP-NOW message: ");
-  Serial.println(message);
-  esp_err_t result = esp_now_send(peerAddress, (uint8_t*)message, strlen(message) + 1);
-  if (result == ESP_OK) {
-    Serial.println("ESP-NOW send success");
-  } else {
-    Serial.print("ESP-NOW send error: ");
-    Serial.println(result);
-  }
-  digitalWrite(buzzerPin, HIGH);
-  delay(200);
-  digitalWrite(buzzerPin, LOW);
+  return event.temperature;
 }
 
-// === Enviar estado para todos os clientes WebSocket ===
+// Read humidity from DHT22
+float readDHT22Humidity() {
+  sensors_event_t event;
+  dht.humidity().getEvent(&event);
+  if (isnan(event.relative_humidity)) {
+    Serial.println(F("Error reading humidity!"));
+    return -1; // Indicate error
+  }
+  return event.relative_humidity;
+}
+
+// Notify all WebSocket clients
 void notifyClients() {
   StaticJsonDocument<200> doc;
-  doc["currentTemp"] = readLM35Temperature();
+  doc["currentTemp"] = readDHT22Temperature();
+  doc["currentHumidity"] = readDHT22Humidity();
   doc["desiredTemp"] = desiredTemp;
   doc["acState"] = acState;
   String response;
@@ -67,7 +63,7 @@ void notifyClients() {
   ws.textAll(response);
 }
 
-// === Eventos do WebSocket ===
+// WebSocket event handler
 void handleWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
   if (type == WS_EVT_CONNECT) {
     connectedClients++;
@@ -79,7 +75,7 @@ void handleWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, 
   }
 }
 
-// === Log de requisições HTTP ===
+// Log HTTP requests
 void logRequest(AsyncWebServerRequest *request) {
   Serial.printf("Request: %s %s from %s\n", request->methodToString(), request->url().c_str(), request->client()->remoteIP().toString().c_str());
 }
@@ -89,13 +85,16 @@ void setup() {
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(buzzerPin, LOW);
 
-  // === Inicializar LittleFS ===
+  // Initialize DHT22
+  dht.begin();
+
+  // Initialize LittleFS
   if (!LittleFS.begin()) {
     Serial.println("Failed to mount LittleFS");
     return;
   }
 
-  // === Inicializar WiFi (station mode para ESP-NOW) ===
+  // Connect to WiFi
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
@@ -105,39 +104,22 @@ void setup() {
   Serial.println("Connected to WiFi");
   Serial.println(WiFi.localIP());
 
-  // === Inicializar ESP-NOW ===
-  if (esp_now_init() != ESP_OK) {
-    Serial.println("Erro ao inicializar ESP-NOW");
-    return;
-  }
-  esp_now_peer_info_t peerInfo = {};
-  memcpy(peerInfo.peer_addr, peerAddress, 6);
-  peerInfo.channel = 0;
-  peerInfo.encrypt = false;
-
-  if (!esp_now_is_peer_exist(peerAddress)) {
-    if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-      Serial.println("Erro ao adicionar peer");
-      return;
-    }
-  }
-  Serial.println("ESP-NOW configurado");
-
-  // === Inicializar WebSocket ===
+  // Setup WebSocket
   ws.onEvent(handleWebSocketEvent);
   server.addHandler(&ws);
 
-  // === Servir arquivos estáticos ===
+  // Serve static files
   server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html").setFilter([](AsyncWebServerRequest *request) {
     logRequest(request);
     return true;
   });
 
-  // === Endpoint /data ===
+  // /data endpoint
   server.on("/data", HTTP_GET, [](AsyncWebServerRequest *request) {
     logRequest(request);
     StaticJsonDocument<200> doc;
-    doc["currentTemp"] = readLM35Temperature();
+    doc["currentTemp"] = readDHT22Temperature();
+    doc["currentHumidity"] = readDHT22Humidity();
     doc["desiredTemp"] = desiredTemp;
     doc["acState"] = acState;
     String response;
@@ -145,7 +127,7 @@ void setup() {
     request->send(200, "application/json", response);
   });
 
-  // === Endpoint /desiredTemp ===
+  // /desiredTemp endpoint
   server.on(
     "/desiredTemp", HTTP_POST, [](AsyncWebServerRequest *request) {},
     NULL,
@@ -174,9 +156,9 @@ void setup() {
           desiredTemp = newTemp;
           Serial.print("Updated desiredTemp to: ");
           Serial.println(desiredTemp);
-          char tempStr[10];
-          snprintf(tempStr, sizeof(tempStr), "%.0f", desiredTemp);
-          sendESPNowMessage(tempStr);
+          digitalWrite(buzzerPin, HIGH);
+          delay(200);
+          digitalWrite(buzzerPin, LOW);
           notifyClients();
           request->send(200, "application/json", "{}");
         } else {
@@ -187,13 +169,15 @@ void setup() {
       }
     });
 
-  // === Endpoint /acToggle ===
+  // /acToggle endpoint
   server.on("/acToggle", HTTP_POST, [](AsyncWebServerRequest *request) {
     logRequest(request);
     acState = !acState;
     Serial.print("Toggled AC state to: ");
     Serial.println(acState ? "On" : "Off");
-    sendESPNowMessage(acState ? "11" : "01");
+    digitalWrite(buzzerPin, HIGH);
+    delay(200);
+    digitalWrite(buzzerPin, LOW);
     notifyClients();
     StaticJsonDocument<200> doc;
     doc["acState"] = acState;
@@ -210,9 +194,11 @@ void loop() {
 
   static unsigned long lastUpdate = 0;
   if (millis() - lastUpdate >= 15000) {
-    float temp = readLM35Temperature();
+    float temp = readDHT22Temperature();
+    float hum = readDHT22Humidity();
     Serial.println("=== System Status ===");
     Serial.printf("Current Temp: %.2f°C\n", temp);
+    Serial.printf("Current Humidity: %.2f%%\n", hum);
     Serial.printf("Desired Temp: %.2f°C\n", desiredTemp);
     Serial.printf("AC State: %s\n", acState ? "On" : "Off");
     Serial.printf("Connected Clients: %d\n", connectedClients);

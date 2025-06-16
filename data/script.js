@@ -12,8 +12,9 @@ function initWebSocket() {
     console.log('WebSocket message received:', event.data);
     try {
       const data = JSON.parse(event.data);
-      if ('currentTemp' in data && 'desiredTemp' in data && 'acState' in data) {
+      if ('currentTemp' in data && 'currentHumidity' in data && 'desiredTemp' in data && 'acState' in data) {
         document.getElementById('currentTemp').textContent = data.currentTemp.toFixed(1);
+        document.getElementById('currentHumidity').textContent = data.currentHumidity === -1 ? 'Erro' : data.currentHumidity.toFixed(1) + '%';
         document.getElementById('desiredTemp').textContent = data.desiredTemp.toFixed(1);
         desiredTemp = data.desiredTemp;
         const acButton = document.getElementById('acButton');
