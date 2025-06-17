@@ -5,6 +5,8 @@
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
+#include <IRremoteESP8266.h>
+#include <IRsend.h>
 
 // Wi-Fi credentials
 const char* ssid = "Casa 44 OI Fibra 2G";
@@ -14,6 +16,7 @@ const char* password = "J626100452";
 const int buzzerPin = 25; // Buzzer pin
 #define DHTPIN 15         // DHT22 data pin
 #define DHTTYPE DHT22     // DHT22 sensor type
+#define IR_LED_PIN 4     // IR LED pin
 
 // Web server on port 80
 AsyncWebServer server(80);
@@ -26,6 +29,27 @@ int connectedClients = 0;  // Number of WebSocket clients
 String receivedBody;       // Accumulate request body
 
 DHT_Unified dht(DHTPIN, DHTTYPE);
+IRsend irsend(IR_LED_PIN);
+
+// IR codes
+const uint32_t POWER_ON_CODE = 0x4131A1A3;
+const uint32_t POWER_OFF_CODE = 0x39B491C4;
+const uint32_t TEMP_CODES[14] = {
+  0x39B491C4, // 17°C
+  0x0782BD58, // 18°C (assumed)
+  0x8E0D62E4, // 19°C
+  0x1BF19A23, // 20°C
+  0x73D4EAEB, // 21°C
+  0x87B1B7B4, // 22°C
+  0x05F3F90C, // 23°C (assumed)
+  0xC15AC824, // 24°C
+  0x179C00E8, // 25°C
+  0x267BDF34, // 26°C
+  0x40631CC0, // 27°C
+  0x9E95A8BB, // 28°C
+  0x32A18FF7, // 29°C
+  0xF6A7B5AF  // 30°C
+};
 
 // Read temperature from DHT22
 float readDHT22Temperature() {
@@ -104,6 +128,9 @@ void setup() {
   Serial.println("Connected to WiFi");
   Serial.println(WiFi.localIP());
 
+  // Initialize IR sender
+  irsend.begin();
+
   // Setup WebSocket
   ws.onEvent(handleWebSocketEvent);
   server.addHandler(&ws);
@@ -159,6 +186,14 @@ void setup() {
           digitalWrite(buzzerPin, HIGH);
           delay(200);
           digitalWrite(buzzerPin, LOW);
+          if (acState) {
+            int tempIndex = (int)desiredTemp - 17;
+            if (tempIndex >= 0 && tempIndex < 14) {
+              Serial.print("Sending temperature code for ");
+              Serial.println(desiredTemp);
+              irsend.sendNEC(TEMP_CODES[tempIndex], 32);
+            }
+          }
           notifyClients();
           request->send(200, "application/json", "{}");
         } else {
@@ -178,6 +213,20 @@ void setup() {
     digitalWrite(buzzerPin, HIGH);
     delay(200);
     digitalWrite(buzzerPin, LOW);
+    if (acState) {
+      Serial.println("Sending power on and temperature code");
+      irsend.sendNEC(POWER_ON_CODE, 32);
+      delay(500); // Small delay
+      int tempIndex = (int)desiredTemp - 17;
+      if (tempIndex >= 0 && tempIndex < 14) {
+        irsend.sendNEC(TEMP_CODES[tempIndex], 32);
+      }
+    } else {
+      Serial.println("Sending power off sequence");
+      irsend.sendNEC(POWER_ON_CODE, 32);
+      delay(700);
+      irsend.sendNEC(POWER_OFF_CODE, 32);
+    }
     notifyClients();
     StaticJsonDocument<200> doc;
     doc["acState"] = acState;
