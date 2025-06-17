@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Controle de Ar Condicionado</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Sistema de Controle de Ar Condicionado</h1>
+  </header>
+  <div class="dashboard">
+    <h2>Painel de Controle</h2>
+    <div class="info">
+      <div class="item">
+        <span>Temperatura Atual:</span>
+        <span id="currentTemp">Carregando...</span>
+      </div>
+      <div class="item">
+        <span>Umidade Atual:</span>
+        <span id="currentHumidity">Carregando...</span>
+      </div>
+      <div class="item">
+        <span>Temperatura Desejada:</span>
+        <div class="desired-control">
+          <button onclick="adjustTemperature(1)">▲</button>
+          <span id="desiredTemp">Carregando...</span>
+          <button onclick="adjustTemperature(-1)">▼</button>
+        </div>
+      </div>
+      <div class="item">
+        <span>Ar Condicionado:</span>
+        <button id="acButton" class="ac-button" onclick="toggleAC()">Carregando...</button>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <p>Controle de Temperatura em Tempo Real</p>
+  </footer>
+</body>
+</html>

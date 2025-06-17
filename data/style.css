@@ -1,0 +1,141 @@
+:root {
+  --background: #241735;
+  --text-color: #fdfcfc;
+  --secondary-bg: #251634;
+  --accent: #6d3161;
+  --ac-on: #4CAF50;
+  --ac-off: #e63946;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: var(--background);
+  color: var(--text-color);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+header {
+  text-align: center;
+  padding: 20px;
+  background-color: var(--secondary-bg);
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+header h1 {
+  margin: 0;
+  color: var(--accent);
+}
+
+.dashboard {
+  background-color: var(--secondary-bg);
+  padding: 20px;
+  border-radius: 0;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  box-sizing: border-box;
+}
+
+.dashboard h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--accent);
+}
+
+.info .item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: rgba(253,252,252,0.05);
+  padding: 10px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+}
+
+.desired-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.desired-control button {
+  background-color: var(--accent);
+  border: none;
+  padding: 5px 8px;
+  font-size: 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-color);
+  transition: background-color 0.3s;
+}
+
+.desired-control button:hover {
+  background-color: #5a2753;
+}
+
+.ac-button {
+  background-color: var(--ac-off);
+  border: none;
+  padding: 8px 12px;
+  font-size: 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-color);
+  transition: background-color 0.3s;
+}
+
+.ac-button.on {
+  background-color: var(--ac-on);
+}
+
+.ac-button:hover {
+  filter: brightness(0.9);
+}
+
+footer {
+  text-align: center;
+  padding: 10px;
+  background-color: var(--secondary-bg);
+  width: 100%;
+  max-width: 400px;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  margin-top: 0;
+}
+
+footer p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-color);
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 15px;
+  }
+
+  .info .item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .desired-control {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .ac-button {
+    width: 100%;
+    text-align: center;
+  }
+}
