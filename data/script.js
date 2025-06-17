@@ -102,3 +102,7 @@ function toggleAC() {
 window.onload = () => {
   initWebSocket();
 };
+
+function pixRealizado() {
+  alert('Pix realizado com sucesso! 💸');
+}
